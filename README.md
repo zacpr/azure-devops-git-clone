@@ -4,20 +4,45 @@
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/ashurtechnet.azure-devops-git-clone)](https://marketplace.visualstudio.com/items?itemName=ashurtechnet.azure-devops-git-clone)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Sign in to Azure DevOps and clone repositories with the native VS Code clone experience — no Personal Access Tokens to juggle, no URLs to copy out of the browser.
+imagine if you could clone azure git repos in vscode as easily as you can do with github repos.....
 
-## Features
+imagine a vscode extension so obvious that the benevolent corporate behemoth behind both vscode and devops forgot to implement it...
 
-- **One-click sign-in** — uses VS Code's built-in Microsoft authentication. The Azure login opens in your browser and returns to VS Code automatically (with a copy & paste fallback if it can't).
-- **Browse, don't paste** — pick your **organization → project → repository** from searchable quick-pick lists.
-- **Native clone experience** — hands off to VS Code's built-in `git.clone`, so you get the same folder picker, progress, and *"Open cloned repository"* prompt as the welcome page's **Clone Git Repository** action.
+...an extension so basic that when asked claude said 'ugh just ask gemini or something'...
 
-## Usage
+well, stop wasting time imagining things and get back to work, it's real now
 
-1. Click **Azure DevOps Clone** in the status bar, or run **Azure DevOps: Clone Git Repository** from the Command Palette (`Ctrl+Shift+P`).
-2. Sign in with your Microsoft / Entra ID account when prompted (first run only — VS Code remembers the session).
-3. Pick an organization, a project, then a repository.
-4. Choose a local folder, and VS Code clones it — done.
+1. click
+
+![Click Azure DevOps Clone in the status bar](images/step1-status-bar.png)
+
+2. click
+
+![Allow the extension to sign in using Microsoft](images/step2-allow-signin.png)
+
+3. login via ms/entra prompts
+
+![Signed in via Microsoft / Entra in the browser](images/step3-signed-in.png)
+
+4. select org
+
+![Select an Azure DevOps organization](images/step4-select-org.png)
+
+5. select project
+
+![Select a project](images/step5-select-project.png)
+
+6. pick a repo, give it a destination, done
+
+![Select a repository to clone](images/step6-select-repo.png)
+
+priced at $0, no telemetry or any data collection. but if you're all hung up about transactions, feel free to take $50 out of your bank account and then send it back to yourself immediately, you've earned it!
+
+## The fine print
+
+- **One-click sign-in** — uses VS Code's built-in Microsoft authentication. The Azure login opens in your browser and returns to VS Code automatically (with a copy & paste fallback if it can't). First run only — VS Code remembers the session.
+- **Browse, don't paste** — pick your **organization → project → repository** from searchable quick-pick lists. No Personal Access Tokens to juggle, no URLs to copy out of the browser.
+- **Native clone experience** — hands off to VS Code's built-in `git.clone`, so you get the same folder picker, progress, and *"Open cloned repository"* prompt as the welcome page's **Clone Git Repository** action. Also available from the Command Palette (`Ctrl+Shift+P`) as **Azure DevOps: Clone Git Repository**.
 
 ## Requirements
 

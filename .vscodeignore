@@ -3,6 +3,7 @@ src/
 node_modules/
 tsconfig.json
 images/*.svg
+images/step*.png
 .gitignore
 .vscodeignore
 *.map
