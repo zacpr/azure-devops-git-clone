@@ -1,0 +1,51 @@
+{
+  "name": "azure-devops-git-clone",
+  "displayName": "Azure DevOps Git Clone",
+  "description": "Sign in to Azure DevOps and clone repositories with the native VS Code clone experience.",
+  "version": "0.0.1",
+  "publisher": "ashurtech",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zacpr/azure-devops-git-clone"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "adoGitClone.cloneRepo",
+        "title": "Azure DevOps: Clone Git Repository",
+        "icon": "$(cloud-download)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "adoGitClone.cloneRepo"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "typescript": "^5.3.3"
+  }
+}
