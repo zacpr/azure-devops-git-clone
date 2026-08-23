@@ -32,7 +32,7 @@ well, stop wasting time imagining things and get back to work, it's real now
 
 ![Select a project](images/step5-select-project.png)
 
-6. pick a repo, give it a destination, done
+6. pick a repo, pick a destination, choose current vs new window, done
 
 ![Select a repository to clone](images/step6-select-repo.png)
 
@@ -42,7 +42,7 @@ priced at $0, no telemetry or any data collection. but if you're all hung up abo
 
 - **One-click sign-in** — uses VS Code's built-in Microsoft authentication. The Azure login opens in your browser and returns to VS Code automatically (with a copy & paste fallback if it can't). First run only — VS Code remembers the session.
 - **Browse, don't paste** — pick your **organization → project → repository** from searchable quick-pick lists. No Personal Access Tokens to juggle, no URLs to copy out of the browser.
-- **Native clone experience** — hands off to VS Code's built-in `git.clone`, so you get the same folder picker, progress, and *"Open cloned repository"* prompt as the welcome page's **Clone Git Repository** action. Also available from the Command Palette (`Ctrl+Shift+P`) as **Azure DevOps: Clone Git Repository**.
+- **Native clone experience** — runs `git clone` directly with live progress (Receiving objects / Resolving deltas) and then opens the cloned repository in your current or a new window, so the flow works consistently whether or not you already have a folder open. Also available from the Command Palette (`Ctrl+Shift+P`) as **Azure DevOps: Clone Git Repository**.
 
 ## Requirements
 

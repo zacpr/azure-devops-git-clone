@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import { spawn } from 'child_process';
+import * as path from 'path';
+import * as os from 'os';
 
 // Azure DevOps resource ID. Requesting /.default on this resource yields an
 // AAD token accepted by dev.azure.com and app.vssps.visualstudio.com.
@@ -109,9 +112,16 @@ async function getRepositories(token: string, organization: string, project: str
  * Run `work` under a progress notification. On failure, shows `errorTitle`
  * and returns undefined so the caller can abort the flow.
  */
-async function withProgressOrError<T>(title: string, errorTitle: string, work: () => Promise<T>): Promise<T | undefined> {
+async function withProgressOrError<T>(
+	title: string,
+	errorTitle: string,
+	work: (progress: vscode.Progress<{ message?: string; increment?: number }>, token: vscode.CancellationToken) => Promise<T>
+): Promise<T | undefined> {
 	try {
-		return await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title }, work);
+		return await vscode.window.withProgress(
+			{ location: vscode.ProgressLocation.Notification, title, cancellable: true },
+			work
+		);
 	} catch (err) {
 		vscode.window.showErrorMessage(`${errorTitle}: ${err instanceof Error ? err.message : String(err)}`);
 		return undefined;
@@ -205,7 +215,143 @@ async function cloneRepoFlow(): Promise<void> {
 		return;
 	}
 
-	// Hand off to VS Code's built-in Git clone command: same folder picker,
-	// progress, and "open cloned repo" prompt as the welcome-page action.
-	await vscode.commands.executeCommand('git.clone', repoPick.repo.remoteUrl);
+	await cloneAndOpen(repoPick.repo);
+}
+
+async function cloneAndOpen(repo: AdoRepository): Promise<void> {
+	const repoName = repo.name;
+
+	// Pick a destination folder. Default to the parent of the current
+	// workspace folder when one is open, otherwise the user's home directory.
+	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+	const defaultParent = workspaceFolder
+		? path.dirname(workspaceFolder.uri.fsPath)
+		: os.homedir();
+
+	const destUris = await vscode.window.showOpenDialog({
+		canSelectFiles: false,
+		canSelectFolders: true,
+		canSelectMany: false,
+		defaultUri: vscode.Uri.file(defaultParent),
+		title: `Choose a folder to clone ${repoName} into`,
+		openLabel: 'Select as Repository Destination'
+	});
+	if (!destUris || destUris.length === 0) {
+		return;
+	}
+
+	const parentPath = destUris[0].fsPath;
+	const targetPath = path.join(parentPath, repoName);
+
+	// Refuse to clobber an existing folder.
+	try {
+		await vscode.workspace.fs.stat(vscode.Uri.file(targetPath));
+		vscode.window.showErrorMessage(
+			`A folder named "${repoName}" already exists at the chosen location. Pick a different destination or remove the existing folder.`
+		);
+		return;
+	} catch {
+		// Path is free; proceed.
+	}
+
+	// Decide whether to open in the current window or a new one. Only ask
+	// when a workspace is actually open — otherwise the choice is obvious.
+	let openInNewWindow = !workspaceFolder;
+	if (workspaceFolder) {
+		const choice = await vscode.window.showQuickPick(
+			[
+				{ label: '$(window) Open in Current Window', description: 'Replace the current workspace with the cloned repository', openInNewWindow: false },
+				{ label: '$(multiple-windows) Open in New Window', description: 'Open the cloned repository in a new VS Code window', openInNewWindow: true }
+			],
+			{ placeHolder: 'Where would you like to open the cloned repository?' }
+		);
+		if (!choice) {
+			return;
+		}
+		openInNewWindow = choice.openInNewWindow;
+	}
+
+	const result = await withProgressOrError(
+		`Cloning ${repoName}…`,
+		`Could not clone ${repoName}`,
+		(progress, token) => runGitClone(repo.remoteUrl, targetPath, progress, token)
+	);
+	if (!result) {
+		return;
+	}
+
+	await vscode.commands.executeCommand(
+		'vscode.openFolder',
+		vscode.Uri.file(targetPath),
+		openInNewWindow ? { forceNewWindow: true } : { forceReuseWindow: true }
+	);
+}
+
+async function runGitClone(
+	url: string,
+	targetPath: string,
+	progress: vscode.Progress<{ message?: string; increment?: number }>,
+	token: vscode.CancellationToken
+): Promise<void> {
+	return new Promise<void>((resolve, reject) => {
+		// shell:true so we pick up the user's git on PATH on every platform
+		// (including Windows where git may live outside the default PATH).
+		const proc = spawn('git', ['clone', '--progress', url, targetPath], { shell: true });
+		let stderr = '';
+		let settled = false;
+
+		const finish = (err?: Error) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			if (err) {
+				reject(err);
+			} else {
+				resolve();
+			}
+		};
+
+		const handleChunk = (text: string) => {
+			// git --progress writes status lines like:
+			//   "Cloning into 'foo'...\n"
+			//   "remote: Counting objects: 100%\n"
+			//   "Receiving objects:  50% (5/10)\n"
+			//   "Resolving deltas: 100% (1/1)\n"
+			const lines = text.split(/\r?\n/);
+			for (const line of lines) {
+				const m = line.match(/(Receiving objects|Resolving deltas):\s+\d+%/);
+				if (m) {
+					progress.report({ message: m[0] });
+				}
+			}
+		};
+
+		proc.stdout?.on('data', (data: Buffer) => handleChunk(data.toString()));
+		proc.stderr?.on('data', (data: Buffer) => {
+			const text = data.toString();
+			stderr += text;
+			handleChunk(text);
+		});
+
+		proc.on('error', (err) => {
+			finish(new Error(`Failed to run git: ${err.message}. Make sure git is installed and on your PATH.`));
+		});
+
+		proc.on('close', (code) => {
+			if (token.isCancellationRequested) {
+				finish(new Error('Clone cancelled.'));
+			} else if (code === 0) {
+				finish();
+			} else {
+				const detail = stderr.trim().split(/\r?\n/).pop() || `exit code ${code}`;
+				finish(new Error(detail));
+			}
+		});
+
+		token.onCancellationRequested(() => {
+			proc.kill();
+			finish(new Error('Clone cancelled.'));
+		});
+	});
 }
