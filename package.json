@@ -46,6 +46,13 @@
         {
           "command": "adoGitClone.cloneRepo"
         }
+      ],
+      "scm/title": [
+        {
+          "command": "adoGitClone.cloneRepo",
+          "group": "navigation",
+          "when": "config.git.enabled"
+        }
       ]
     }
   },

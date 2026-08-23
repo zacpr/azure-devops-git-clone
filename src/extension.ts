@@ -43,8 +43,8 @@ export function activate(context: vscode.ExtensionContext): void {
 	);
 
 	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-	statusBarItem.text = '$(cloud-download) Azure DevOps Clone';
-	statusBarItem.tooltip = 'Clone a repository from Azure DevOps';
+	statusBarItem.text = '$(cloud-download)';
+	statusBarItem.tooltip = 'Azure DevOps: Clone Git Repository';
 	statusBarItem.command = 'adoGitClone.cloneRepo';
 	statusBarItem.show();
 	context.subscriptions.push(statusBarItem);
