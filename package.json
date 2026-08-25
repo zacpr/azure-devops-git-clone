@@ -2,7 +2,7 @@
   "name": "azure-devops-git-clone",
   "displayName": "Azure DevOps Git Clone",
   "description": "Sign in to Azure DevOps and clone repositories with the native VS Code clone experience.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "ashurtechnet",
   "license": "MIT",
   "repository": {
@@ -41,6 +41,16 @@
         "icon": "$(cloud-download)"
       }
     ],
+    "configuration": {
+      "title": "Azure DevOps Git Clone",
+      "properties": {
+        "adoGitClone.defaultClonePath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Default parent folder for cloned repositories. Leave empty to default to the parent of the current workspace folder, or your home directory. Supports `~` for the home directory (e.g. `~/repos`)."
+        }
+      }
+    },
     "menus": {
       "commandPalette": [
         {

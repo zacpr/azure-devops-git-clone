@@ -43,8 +43,8 @@ export function activate(context: vscode.ExtensionContext): void {
 	);
 
 	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-	statusBarItem.text = '$(cloud-download)';
-	statusBarItem.tooltip = 'Azure DevOps: Clone Git Repository';
+	statusBarItem.text = '$(cloud-download) Azure DevOps Clone';
+	statusBarItem.tooltip = 'Clone a repository from Azure DevOps';
 	statusBarItem.command = 'adoGitClone.cloneRepo';
 	statusBarItem.show();
 	context.subscriptions.push(statusBarItem);
@@ -220,57 +220,59 @@ async function cloneRepoFlow(): Promise<void> {
 
 async function cloneAndOpen(repo: AdoRepository): Promise<void> {
 	const repoName = repo.name;
+	const defaultParent = getDefaultCloneParent();
 
-	// Pick a destination folder. Default to the parent of the current
-	// workspace folder when one is open, otherwise the user's home directory.
-	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-	const defaultParent = workspaceFolder
-		? path.dirname(workspaceFolder.uri.fsPath)
-		: os.homedir();
-
+	// Pick a destination parent folder.
 	const destUris = await vscode.window.showOpenDialog({
 		canSelectFiles: false,
 		canSelectFolders: true,
 		canSelectMany: false,
 		defaultUri: vscode.Uri.file(defaultParent),
 		title: `Choose a folder to clone ${repoName} into`,
-		openLabel: 'Select as Repository Destination'
+		openLabel: 'Select Parent Folder'
 	});
 	if (!destUris || destUris.length === 0) {
 		return;
 	}
-
 	const parentPath = destUris[0].fsPath;
-	const targetPath = path.join(parentPath, repoName);
+
+	// Name the subdirectory. Default to "<repoName>_<timestamp>" so back-to-back
+	// clones of the same repo don't collide; the user can rename to anything.
+	const defaultSubdir = `${repoName}_${timestamp()}`;
+	const subdirInput = await vscode.window.showInputBox({
+		title: 'Name the cloned folder',
+		prompt: `Will be created inside ${parentPath}`,
+		value: defaultSubdir,
+		placeHolder: defaultSubdir,
+		validateInput: (value) => {
+			const trimmed = value.trim();
+			if (!trimmed) {
+				return 'Folder name cannot be empty.';
+			}
+			if (/[<>:"|?*\x00-\x1f]/.test(trimmed) || trimmed === '.' || trimmed === '..') {
+				return 'Folder name contains invalid characters.';
+			}
+			return undefined;
+		}
+	});
+	if (subdirInput === undefined) {
+		return; // user cancelled
+	}
+	const subdirName = subdirInput.trim();
+	const targetPath = path.join(parentPath, subdirName);
 
 	// Refuse to clobber an existing folder.
 	try {
 		await vscode.workspace.fs.stat(vscode.Uri.file(targetPath));
 		vscode.window.showErrorMessage(
-			`A folder named "${repoName}" already exists at the chosen location. Pick a different destination or remove the existing folder.`
+			`A folder named "${subdirName}" already exists at the chosen location. Pick a different name or remove the existing folder.`
 		);
 		return;
 	} catch {
 		// Path is free; proceed.
 	}
 
-	// Decide whether to open in the current window or a new one. Only ask
-	// when a workspace is actually open — otherwise the choice is obvious.
-	let openInNewWindow = !workspaceFolder;
-	if (workspaceFolder) {
-		const choice = await vscode.window.showQuickPick(
-			[
-				{ label: '$(window) Open in Current Window', description: 'Replace the current workspace with the cloned repository', openInNewWindow: false },
-				{ label: '$(multiple-windows) Open in New Window', description: 'Open the cloned repository in a new VS Code window', openInNewWindow: true }
-			],
-			{ placeHolder: 'Where would you like to open the cloned repository?' }
-		);
-		if (!choice) {
-			return;
-		}
-		openInNewWindow = choice.openInNewWindow;
-	}
-
+	// Clone first, then prompt for how to open — matches VS Code's native flow.
 	const result = await withProgressOrError(
 		`Cloning ${repoName}…`,
 		`Could not clone ${repoName}`,
@@ -280,11 +282,45 @@ async function cloneAndOpen(repo: AdoRepository): Promise<void> {
 		return;
 	}
 
+	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+	let openInNewWindow = !workspaceFolder;
+	if (workspaceFolder) {
+		const choice = await vscode.window.showQuickPick(
+			[
+				{ label: '$(window) Open in Current Window', description: 'Replace the current workspace with the cloned repository', openInNewWindow: false },
+				{ label: '$(multiple-windows) Open in New Window', description: 'Open the cloned repository in a new VS Code window', openInNewWindow: true }
+			],
+			{ placeHolder: `Cloned to ${targetPath}. Where would you like to open it?` }
+		);
+		if (!choice) {
+			return; // user dismissed; clone succeeded, they can navigate manually
+		}
+		openInNewWindow = choice.openInNewWindow;
+	}
+
 	await vscode.commands.executeCommand(
 		'vscode.openFolder',
 		vscode.Uri.file(targetPath),
 		openInNewWindow ? { forceNewWindow: true } : { forceReuseWindow: true }
 	);
+}
+
+function getDefaultCloneParent(): string {
+	const configured = vscode.workspace.getConfiguration('adoGitClone').get<string>('defaultClonePath', '').trim();
+	if (configured) {
+		if (configured === '~' || configured.startsWith('~/') || configured.startsWith('~\\')) {
+			return path.join(os.homedir(), configured.slice(1).replace(/^[/\\]/, ''));
+		}
+		return configured;
+	}
+	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+	return workspaceFolder ? path.dirname(workspaceFolder.uri.fsPath) : os.homedir();
+}
+
+function timestamp(): string {
+	const d = new Date();
+	const pad = (n: number) => n.toString().padStart(2, '0');
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}_${pad(d.getSeconds())}`;
 }
 
 async function runGitClone(
