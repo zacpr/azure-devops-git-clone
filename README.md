@@ -44,6 +44,27 @@ priced at $0, no telemetry or any data collection. but if you're all hung up abo
 - **Browse, don't paste** — pick your **organization → project → repository** from searchable quick-pick lists. No Personal Access Tokens to juggle, no URLs to copy out of the browser.
 - **Native clone experience** — runs `git clone` directly with live progress (Receiving objects / Resolving deltas) and then opens the cloned repository in your current or a new window, so the flow works consistently whether or not you already have a folder open. Also available from the Command Palette (`Ctrl+Shift+P`) as **Azure DevOps: Clone Git Repository**.
 
+## How a clone goes down
+
+1. Sign in to Microsoft / Entra (first run only).
+2. Pick **organization → project → repository**.
+3. Pick a **parent folder** (defaults to your configured default — see below).
+4. Name the **clone folder** (default: `<repo-name>_<timestamp>`, e.g. `web-app_2026-08-25-1538_47`, so back-to-back clones don't collide — edit to whatever).
+5. Watch the clone progress.
+6. Pick **Open in Current Window** or **Open in New Window** (only asked when a workspace is open).
+
+## Configuration
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `adoGitClone.defaultClonePath` | _(empty)_ | Parent folder used in the destination picker. Leave empty to default to the parent of the current workspace folder, or your home directory if no workspace is open. Supports `~` for the home directory (e.g. `~/repos`). |
+
+Set it in `settings.json`:
+
+```json
+"adoGitClone.defaultClonePath": "~/repos/azure"
+```
+
 ## Requirements
 
 - VS Code 1.85 or newer

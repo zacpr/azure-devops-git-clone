@@ -2,7 +2,7 @@
   "name": "azure-devops-git-clone",
   "displayName": "Azure DevOps Git Clone",
   "description": "Sign in to Azure DevOps and clone repositories with the native VS Code clone experience.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "ashurtechnet",
   "license": "MIT",
   "repository": {
