@@ -284,45 +284,65 @@ async function cloneAndOpen(repo: AdoRepository): Promise<void> {
 
 	const targetUri = vscode.Uri.file(targetPath);
 
-	const hadWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
-	let openInNewWindow = !hadWorkspace;
-	if (hadWorkspace) {
-		const choice = await vscode.window.showQuickPick(
-			[
-				{ label: '$(window) Open in Current Window', description: 'Replace the current workspace with the cloned repository', openInNewWindow: false },
-				{ label: '$(multiple-windows) Open in New Window', description: 'Open the cloned repository in a new VS Code window', openInNewWindow: true }
-			],
-			{ placeHolder: `Cloned to ${targetPath}. Where would you like to open it?` }
-		);
-		if (!choice) {
-			return; // user dismissed; clone succeeded, they can navigate manually
+	// Always ask — even with no workspace open — so the user has visibility
+	// and control. ignoreFocusOut keeps it visible if focus drifts.
+	type Mode = 'current' | 'new' | 'none';
+	const choice = await vscode.window.showQuickPick<{ label: string; description: string; mode: Mode }>(
+		[
+			{ label: '$(window) Open in Current Window', description: 'Replace the current workspace with the cloned repository', mode: 'current' },
+			{ label: '$(multiple-windows) Open in New Window', description: 'Open the cloned repository in a new VS Code window', mode: 'new' },
+			{ label: '$(check) Done', description: 'Leave the clone where it is; do not open', mode: 'none' }
+		],
+		{
+			title: `Cloned ${repoName}`,
+			placeHolder: `Cloned to ${targetPath}. Where would you like to open it?`,
+			ignoreFocusOut: true
 		}
-		openInNewWindow = choice.openInNewWindow;
+	);
+
+	// If the quickPick fails to materialize (or is dismissed), fall back to a
+	// notification so the user always sees the clone actually happened.
+	if (!choice) {
+		const fallback = await vscode.window.showInformationMessage(
+			`Cloned ${repoName} to ${targetPath}.`,
+			'Open Here',
+			'Open in New Window'
+		);
+		if (fallback === 'Open Here') {
+			await vscode.commands.executeCommand('vscode.openFolder', targetUri);
+		} else if (fallback === 'Open in New Window') {
+			await vscode.commands.executeCommand('vscode.openFolder', targetUri, { forceNewWindow: true });
+		}
+		return;
 	}
 
-	if (openInNewWindow) {
+	if (choice.mode === 'none') {
+		vscode.window.showInformationMessage(`Cloned to ${targetPath}`);
+		return;
+	}
+
+	// Try multiple open strategies in order of reliability.
+	if (choice.mode === 'new') {
 		await vscode.commands.executeCommand('vscode.openFolder', targetUri, { forceNewWindow: true });
 		return;
 	}
 
-	if (hadWorkspace) {
-		// Replace current workspace folders with the cloned repo. This is the
-		// documented API and works reliably; the undocumented forceReuseWindow
-		// flag silently no-ops from extension code in some scenarios.
-		const existing = vscode.workspace.workspaceFolders ?? [];
-		if (vscode.workspace.updateWorkspaceFolders(0, existing.length, { uri: targetUri, name: subdirName })) {
-			return;
-		}
-		// Fallback: saved workspace (.code-workspace) can block updateWorkspaceFolders.
-		// Tell the user the path so they can open it manually.
+	// choice.mode === 'current'
+	const existing = vscode.workspace.workspaceFolders ?? [];
+	if (existing.length > 0 && vscode.workspace.updateWorkspaceFolders(0, existing.length, { uri: targetUri, name: subdirName })) {
+		return;
 	}
 
-	const openAction = await vscode.window.showInformationMessage(
-		`Cloned to ${targetPath}.`,
-		'Open Here'
-	);
-	if (openAction === 'Open Here') {
+	try {
 		await vscode.commands.executeCommand('vscode.openFolder', targetUri);
+	} catch (err) {
+		const retry = await vscode.window.showErrorMessage(
+			`Cloned to ${targetPath}, but could not open it automatically.`,
+			'Open Manually'
+		);
+		if (retry === 'Open Manually') {
+			await vscode.commands.executeCommand('vscode.openFolder', targetUri);
+		}
 	}
 }
 
