@@ -282,9 +282,11 @@ async function cloneAndOpen(repo: AdoRepository): Promise<void> {
 		return;
 	}
 
-	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-	let openInNewWindow = !workspaceFolder;
-	if (workspaceFolder) {
+	const targetUri = vscode.Uri.file(targetPath);
+
+	const hadWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
+	let openInNewWindow = !hadWorkspace;
+	if (hadWorkspace) {
 		const choice = await vscode.window.showQuickPick(
 			[
 				{ label: '$(window) Open in Current Window', description: 'Replace the current workspace with the cloned repository', openInNewWindow: false },
@@ -298,11 +300,30 @@ async function cloneAndOpen(repo: AdoRepository): Promise<void> {
 		openInNewWindow = choice.openInNewWindow;
 	}
 
-	await vscode.commands.executeCommand(
-		'vscode.openFolder',
-		vscode.Uri.file(targetPath),
-		openInNewWindow ? { forceNewWindow: true } : { forceReuseWindow: true }
+	if (openInNewWindow) {
+		await vscode.commands.executeCommand('vscode.openFolder', targetUri, { forceNewWindow: true });
+		return;
+	}
+
+	if (hadWorkspace) {
+		// Replace current workspace folders with the cloned repo. This is the
+		// documented API and works reliably; the undocumented forceReuseWindow
+		// flag silently no-ops from extension code in some scenarios.
+		const existing = vscode.workspace.workspaceFolders ?? [];
+		if (vscode.workspace.updateWorkspaceFolders(0, existing.length, { uri: targetUri, name: subdirName })) {
+			return;
+		}
+		// Fallback: saved workspace (.code-workspace) can block updateWorkspaceFolders.
+		// Tell the user the path so they can open it manually.
+	}
+
+	const openAction = await vscode.window.showInformationMessage(
+		`Cloned to ${targetPath}.`,
+		'Open Here'
 	);
+	if (openAction === 'Open Here') {
+		await vscode.commands.executeCommand('vscode.openFolder', targetUri);
+	}
 }
 
 function getDefaultCloneParent(): string {
