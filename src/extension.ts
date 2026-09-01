@@ -369,8 +369,8 @@ async function runGitClone(
 	targetPath: string,
 	progress: vscode.Progress<{ message?: string; increment?: number }>,
 	token: vscode.CancellationToken
-): Promise<void> {
-	return new Promise<void>((resolve, reject) => {
+): Promise<boolean> {
+	return new Promise<boolean>((resolve, reject) => {
 		// shell:true so we pick up the user's git on PATH on every platform
 		// (including Windows where git may live outside the default PATH).
 		const proc = spawn('git', ['clone', '--progress', url, targetPath], { shell: true });
@@ -385,7 +385,7 @@ async function runGitClone(
 			if (err) {
 				reject(err);
 			} else {
-				resolve();
+				resolve(true);
 			}
 		};
 
